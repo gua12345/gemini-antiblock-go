@@ -49,9 +49,9 @@ COPY --from=builder /app/.env.example /.env.example
 # 设置默认环境变量
 ENV PORT=8080
 ENV UPSTREAM_URL_BASE=https://generativelanguage.googleapis.com
-ENV MAX_CONSECUTIVE_RETRIES=100
+ENV MAX_CONSECUTIVE_RETRIES=10
 ENV DEBUG_MODE=true
-ENV RETRY_DELAY_MS=750
+ENV RETRY_DELAY_MS=250
 ENV SWALLOW_THOUGHTS_AFTER_RETRY=true
 
 # 暴露端口

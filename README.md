@@ -14,17 +14,50 @@
 
 ## 安装和运行
 
-### 前置要求
+### 方式一：使用 Docker（推荐）
+
+#### 快速开始
+
+```bash
+# 拉取镜像
+docker pull gua12345/gemini-antiblock:latest
+
+# 运行容器
+docker run -p 8080:8080 gua12345/gemini-antiblock:latest
+```
+
+#### 带环境变量运行
+
+```bash
+docker run -p 18787:8080 \
+  -e UPSTREAM_URL_BASE=https://generativelanguage.googleapis.com \
+  -e MAX_CONSECUTIVE_RETRIES=100 \
+  -e DEBUG_MODE=true \
+  -e RETRY_DELAY_MS=750 \
+  -e SWALLOW_THOUGHTS_AFTER_RETRY=true \
+  gua12345/gemini-antiblock:latest
+```
+
+#### 使用 docker-compose
+
+```bash
+# 下载 docker-compose.yml 文件后
+docker-compose up -d
+```
+
+### 方式二：从源码编译
+
+#### 前置要求
 
 - Go 1.21 或更高版本
 
-### 安装依赖
+#### 安装依赖
 
 ```bash
 go mod download
 ```
 
-### 配置
+#### 配置
 
 1. 复制环境变量示例文件：
 
@@ -54,7 +87,7 @@ SWALLOW_THOUGHTS_AFTER_RETRY=true
 PORT=8080
 ```
 
-### 运行
+#### 运行
 
 ```bash
 go run main.go
@@ -74,9 +107,9 @@ go build -o gemini-antiblock
 | 变量名                         | 默认值                                      | 描述                       |
 | ------------------------------ | ------------------------------------------- | -------------------------- |
 | `UPSTREAM_URL_BASE`            | `https://generativelanguage.googleapis.com` | Gemini API 的基础 URL      |
-| `MAX_CONSECUTIVE_RETRIES`      | `100`                                       | 流中断时的最大连续重试次数 |
+| `MAX_CONSECUTIVE_RETRIES`      | `10`                                       | 连续重试的最大次数 |
 | `DEBUG_MODE`                   | `true`                                      | 是否启用调试日志           |
-| `RETRY_DELAY_MS`               | `750`                                       | 重试间隔时间（毫秒）       |
+| `RETRY_DELAY_MS`               | `250`                                       | 重试间隔时间（毫秒）       |
 | `SWALLOW_THOUGHTS_AFTER_RETRY` | `true`                                      | 重试后是否过滤思考内容     |
 | `PORT`                         | `8080`                                      | 服务器监听端口             |
 
@@ -143,11 +176,24 @@ gemini-antiblock-go/
 4. **异常完成原因**: 非正常的完成原因
 5. **不完整响应**: 响应看起来不完整
 
+### 重试计数逻辑
+
+- **重试计数器**: 每次流中断时计数器+1
+- **成功重置**: 每次重试成功获得新流后，计数器重置为0
+- **独立周期**: 每次中断都开始一个新的重试周期，最多允许连续重试 `MAX_CONSECUTIVE_RETRIES` 次
+
+**示例场景**（假设 `MAX_CONSECUTIVE_RETRIES=100`）：
+```
+初始请求 → 中断 → 计数=1 → 重试成功 → 计数重置为0
+新流处理 → 中断 → 计数=1 → 重试成功 → 计数重置为0
+新流处理 → 中断 → 计数=1 → 重试中断 → 计数=2 → 重试成功 → 计数重置为0
+```
+
 重试时会：
 
 - 保留已生成的文本作为上下文
 - 构建继续对话的新请求
-- 在达到最大重试次数后返回错误
+- 在单个重试周期达到最大重试次数后返回错误
 
 ## 日志记录
 
@@ -156,6 +202,47 @@ gemini-antiblock-go/
 - **DEBUG**: 详细的调试信息（仅在调试模式下显示）
 - **INFO**: 一般信息和操作状态
 - **ERROR**: 错误信息和异常
+
+## Docker 部署
+
+### 支持的架构
+
+- `linux/amd64` - Intel/AMD 64位处理器
+- `linux/arm64` - ARM 64位处理器（如 Apple M1/M2, AWS Graviton）
+
+### 镜像信息
+
+- **镜像地址**: `gua12345/gemini-antiblock:latest`
+- **基础镜像**: scratch（最小化镜像）
+- **镜像大小**: < 20MB
+- **安全特性**: 非 root 用户运行
+
+### 生产部署示例
+
+```bash
+# 后台运行，自动重启
+docker run -d \
+  --name gemini-antiblock \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -e DEBUG_MODE=false \
+  -e MAX_CONSECUTIVE_RETRIES=50 \
+  gua12345/gemini-antiblock:latest
+```
+
+### 健康检查
+
+容器包含内置健康检查，可以通过以下方式查看状态：
+
+```bash
+# 查看容器健康状态
+docker ps
+
+# 查看详细健康检查日志
+docker inspect --format='{{.State.Health}}' <container_name>
+```
+
+更多 Docker 部署信息请参考 [DOCKER.md](DOCKER.md)。
 
 ## 许可证
 

@@ -314,6 +314,10 @@ func ProcessStreamAndRetryInternally(cfg *config.Config, initialReader io.Reader
 		logger.LogInfo(fmt.Sprintf("✓ Retry attempt %d successful - got new stream", consecutiveRetryCount))
 		logger.LogInfo(fmt.Sprintf("Continuing with accumulated context (%d chars)", len(accumulatedText)))
 
+		// Reset retry counter after successful retry
+		logger.LogInfo(fmt.Sprintf("Resetting retry counter from %d to 0 after successful retry", consecutiveRetryCount))
+		consecutiveRetryCount = 0
+
 		currentReader = retryResponse.Body
 	}
 }
